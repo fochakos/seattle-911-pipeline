@@ -1,0 +1,63 @@
+name: Daily pipeline
+
+on:
+  schedule:
+    - cron: "17 14 * * *"     # every day at 14:17 UTC (6:17 am Seattle in winter, 7:17 am in summer)
+  workflow_dispatch:          # "Run workflow" button for manual runs
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false   # never run two loads into the warehouse at once
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # The DuckDB warehouse is kept between runs in the Actions cache. If the cache is
+      # ever evicted, the pipeline simply backfills from START_DATE (about 2 minutes).
+      - name: Restore warehouse
+        uses: actions/cache/restore@v6
+        with:
+          path: data/warehouse.duckdb
+          key: warehouse-${{ github.run_id }}
+          restore-keys: warehouse-
+
+      - name: Extract, load, transform, check, build dashboard
+        id: pipeline
+        run: python -m pipeline.run
+        env:
+          SOCRATA_APP_TOKEN: ${{ secrets.SOCRATA_APP_TOKEN }}   # optional
+
+      # Saved even when a check fails, so the run log keeps the failed run.
+      - name: Save warehouse
+        if: always() && hashFiles('data/warehouse.duckdb') != ''
+        uses: actions/cache/save@v6
+        with:
+          path: data/warehouse.duckdb
+          key: warehouse-${{ github.run_id }}
+
+      # Publishing only happens if the pipeline step succeeded (all error-level checks passed).
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v5
