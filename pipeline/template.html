@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seattle Fire 911 Calls</title>
+<meta name="description" content="Daily-updated dashboard of Seattle Fire Department 911 calls, built by an automated data pipeline.">
+<script src="{{VEGA}}"></script>
+<script src="{{VEGA_LITE}}"></script>
+<script src="{{VEGA_EMBED}}"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --line: #e1e0d9; --blue: #2a78d6;
+    --pass: #0ca30c; --warn: #b77f00; --fail: #d03b3b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 15px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  main { max-width: 1120px; margin: 0 auto; padding: 32px 16px 48px; }
+  header h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; }
+  header p { margin: 0; color: var(--ink-2); }
+  .meta { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  a { color: var(--blue); }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 24px 0; }
+  .tile, .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  .tile { padding: 14px 16px; }
+  .tile .label { font-size: 13px; color: var(--ink-2); }
+  .tile .value { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 2px 0; }
+  .tile .sub { font-size: 12.5px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { padding: 16px 18px; min-width: 0; }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 { font-size: 16px; margin: 0; }
+  .card .desc { font-size: 13px; color: var(--ink-2); margin: 2px 0 12px; }
+  .chart { width: 100%; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--line); padding: 6px 8px; }
+  td { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .badge { font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge.pass { color: var(--pass); } .badge.warn { color: var(--warn); } .badge.error { color: var(--fail); }
+  footer { margin-top: 28px; font-size: 13px; color: var(--ink-2); }
+  footer ol { padding-left: 20px; }
+  @media (max-width: 860px) {
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 420px) { .tile .value { font-size: 22px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Seattle Fire 911 Calls</h1>
+    <p>Every call to the Seattle Fire Department since {{FIRST_DAY}} ({{TOTAL}} calls), refreshed every morning by an automated pipeline.</p>
+    <div class="meta">Last pipeline run: {{UPDATED}} · Latest call in the data: {{LATEST}} (Seattle time) ·
+      <a href="{{REPO}}">Source code</a></div>
+  </header>
+
+  <section class="tiles">
+{{KPIS}}
+  </section>
+
+  <section class="grid">
+    <div class="card wide">
+      <h2>Calls per day, last 12 months</h2>
+      <p class="desc">Grey: daily count. Blue: 7-day average. Hover for values.</p>
+      <div id="daily" class="chart"></div>
+    </div>
+    <div class="card">
+      <h2>Last 30 days by category</h2>
+      <p class="desc">Bars: last 30 complete days. Black ticks: the same 30 days a year earlier.</p>
+      <div id="categories" class="chart"></div>
+    </div>
+    <div class="card">
+      <h2>When calls come in</h2>
+      <p class="desc">Average calls per hour, last 52 weeks.</p>
+      <div id="heatmap" class="chart"></div>
+    </div>
+    <div class="card wide">
+      <h2>Calls in the last 7 days</h2>
+      <p class="desc">Each dot is one call, coloured by category. Hover for the call type and time.</p>
+      <div id="map" class="chart"></div>
+    </div>
+    <div class="card">
+      <h2>Calls per month since 2021</h2>
+      <p class="desc">Complete months only.</p>
+      <div id="monthly" class="chart"></div>
+    </div>
+    <div class="card">
+      <h2>Top call types, last 30 days</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Type</th><th>Category</th><th class="num">Calls</th></tr></thead>
+        <tbody>
+{{TYPES}}
+        </tbody>
+      </table></div>
+    </div>
+    <div class="card wide">
+      <h2>Data-quality checks (this run)</h2>
+      <p class="desc">If an <b>error</b> check fails, the run stops and this page is not republished. <b>Warn</b> checks are reported here but don't block publishing.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Result</th><th>Check</th><th>Value</th><th>Rule</th><th>Severity</th></tr></thead>
+        <tbody>
+{{CHECKS}}
+        </tbody>
+      </table></div>
+    </div>
+    <div class="card wide">
+      <h2>Recent pipeline runs</h2>
+      <p class="desc">Each run re-reads the last 3 days so late corrections are picked up; "changed" counts corrected rows.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Run</th><th>Started (Seattle time)</th><th>Status</th><th class="num">Rows fetched</th>
+          <th class="num">New</th><th class="num">Changed</th><th class="num">Duration</th></tr></thead>
+        <tbody>
+{{RUNS}}
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>How it works.</b> A GitHub Actions job runs every morning:</p>
+    <ol>
+      <li><b>Extract</b> new calls from the <a href="{{SOURCE}}">City of Seattle open-data API</a>.</li>
+      <li><b>Load</b> them into DuckDB, keyed on incident number, so re-running is safe.</li>
+      <li><b>Transform</b> with SQL into a clean staging view and summary tables.</li>
+      <li><b>Check</b> freshness, duplicates, missing values, missing days, coordinates and volume.</li>
+      <li><b>Publish</b> this page to GitHub Pages, only if every error-level check passed.</li>
+    </ol>
+    <p>Machine-readable outputs: <a href="data/latest.json">latest.json</a> · <a href="data/daily_calls.csv">daily_calls.csv</a> · <a href="data/runs.json">runs.json</a>.
+      Data: City of Seattle, public domain. Categories are assigned by keyword rules in <a href="{{REPO}}/blob/main/sql/10_staging.sql">10_staging.sql</a>.</p>
+  </footer>
+</main>
+<script>
+  const specs = {{SPECS}};
+  for (const [id, spec] of Object.entries(specs)) {
+    vegaEmbed("#" + id, spec, { actions: false, renderer: "svg" }).catch(err => {
+      document.getElementById(id).textContent = "Chart failed to load: " + err.message;
+    });
+  }
+</script>
+</body>
+</html>
