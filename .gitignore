@@ -1,0 +1,16 @@
+# Warehouse (kept in the GitHub Actions cache, rebuilt from the API if missing)
+data/
+
+# Generated dashboard (published to GitHub Pages by the workflow)
+site/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
